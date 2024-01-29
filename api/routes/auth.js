@@ -1,0 +1,71 @@
+const router = require("express").Router();
+const User = require("../models/User");
+const CryptoJS = require("crypto-js");
+const jwt = require("jsonwebtoken");
+
+//REGISTER
+router.post("/register", async (req, res) => {
+  const newUser = new User({
+    username: req.body.username,
+    email: req.body.email,
+    password: CryptoJS.AES.encrypt(
+      req.body.password,
+      process.env.PASS_SECRET
+    ).toString(),
+  });
+
+  try {
+    const savedUser = await newUser.save();
+    res.status(201).json(savedUser);
+  } catch (err) {
+    res.status(500).json(err);
+  }
+});
+
+//LOGIN
+
+router.post('/login', async (req, res) => {
+    try{
+        const user = await User.findOne(
+            {
+                userName: req.body.user_name
+            }
+            );
+            console.log(user)
+
+        !user && res.status(401).json("Wrong User Name");
+
+        const hashedPassword = CryptoJS.AES.decrypt(
+            user.password,
+            process.env.PASS_SECRET
+        );
+
+
+        const originalPassword = hashedPassword.toString(CryptoJS.enc.Utf8);
+
+        const inputPassword = req.body.password;
+        
+        originalPassword != inputPassword && 
+            res.status(401).json("Wrong Password");
+
+        const accessToken = jwt.sign(
+        {
+            id: user._id,
+            isAdmin: user.isAdmin,
+        },
+        process.env.JWT_SECRET,
+            {expiresIn:"3d"}
+        );
+  
+        const { password, ...others } = user._doc;  
+        res.status(200).json({...others, accessToken});
+
+    }catch(err){
+        res.status(500).json(err);
+    }
+
+});
+
+module.exports = router;
+
+let str = [{\"Item\":{\"ID\":93,\"Name\":\"aAvène Cleanance HYDRA Crème lavante apaisante\",\"Symbol\":\"a5,28\",\"Barcode\":\"aF00236911\",\"Unit\":\"\",\"Category_ID\":1,\"Onhand\":-16.00,\"Date\":\"2023-09-03T11:52:24.157\",\"Notes\":\"Nettoie en douceur les peaux sensibles à imperfections et/ou irritées\\r\\n\\r\\nNettoie en douceur les peaux sensibles à imperfections et/ou irritées par des traitements médicamenteux desséchants. Sa formule rétablit le confort cutané et apaise les irritations p\",\"Photo\":\"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\",\"PhotoType\":\"\",\"Stopped\":false,\"UID\":0,\"Datestamp\":\"2023-09-03T11:52:24.157\",\"ItemService\":false,\"MinOnhand\":0.00,\"SerialNumber\":\"a3282770100921\",\"ItemWeight\":0.000000,\"InternalBarcode\":false,\"Refrigerator\":false,\"Country\":0,\"Offer\":\"\",\"Form\":0,\"Manufacturer\":\"\",\"UsedTo\":\"Apliquez Cleanance HYDRA Crème lavante apaisante matin et soir sur le visage préalablement humidifié, émulsionnez à l’eau, rincez abondamment puis séchez.\",\"Indication\":\"Cleanance HYDRA Crème lavante apaisante est particulièrement indiquée pour les peaux désséchées par les traitements médicamenteux.\",\"Warning\":\"\",\"Dosage\":\"\",\"Mechanism\":\"Nettoyante: La base lavante douce sans savon à pH physiologique de la crème lavante élimine les impuretés en douceur tout en respectant la sensibilité des peaux fragilisées par les traitements desséchants.\\r\\nNourrissante: Grâce à ses actifs hydratants et relipidants, Cleanance HYDRA crème lavante permet d'apporter hydration et confort à la peau désséchée.\\r\\nApaisante: Le Sulfate de Dextran apaise et réduit les sensations d'inconfort.\\r\\nL'Eau thermale d'Avène restitue toutes ses propriétés apaisantes, anti-irritantes et adoucissantes.\",\"SideEffects\":\"\",\"Ingredients\":\"Flacon de 200 ml\",\"Composition\":\"AVENE THERMAL SPRING WATER (AVENE AQUA). WATER (AQUA). GLYCERIN. SODIUM COCOAMPHOACETATE. COCO-GLUCOSIDE. SODIUM MYRISTOYL GLUTAMATE. GLYCOL DISTEARATE. GLYCERYL OLEATE. SODIUM CHLORIDE. ACRYLATES/C10-30 ALKYL ACRYLATE CROSSPOLYMER. CAPRYLYL GLYCOL. CITRIC ACID. FRAGRANCE (PARFUM). GLYCERYL LINOLEATE. GLYCERYL LINOLENATE. GLYCERYL PALMITATE. GLYCERYL STEARATE. GLYCINE SOJA (SOYBEAN) OIL (GLYCINE SOJA OIL). HYDROGENATED PALM GLYCERIDES CITRATE. PEG-30 DIPOLYHYDROXYSTEARATE. PEG-40 HYDROGENATED CASTOR OIL. PROPANEDIOL. SALICYLIC ACID. SODIUM BENZOATE. SODIUM DEXTRAN SULFATE. SODIUM HYDROXIDE. TOCOPHEROL. TRIDECETH-6\",\"HasExpiry\":false,\"ParentID\":0,\"BrandID\":3,\"Categories\":null,\"Categoryname\":\"FACE\",\"Forms\":null,\"Countries\":null,\"Brand\":\"Avene\",\"price\":50.990000,\"ParentItem\":null,\"ItemUser\":null,\"PriceView\":null,\"Currency\":4,\"HasOffer\":false,\"isPreferred\":false,\"OfferQty\":0.0,\"discount\":0.0,\"vat\":0.0},\"Images\":null,\"Currency\":null,\"ItemID\":93,\"Quantity\":1,\"HasOffer\":false,\"isPreferred\":false}]";
